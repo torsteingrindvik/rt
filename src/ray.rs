@@ -1,6 +1,13 @@
+use std::ops::Range;
+
 use bevy_color::{Color, ColorToComponents, LinearRgba, Mix};
 use bevy_math::{vec3, Dir3, NormedVectorSpace, Ray3d, Vec3};
 use tracing::debug;
+
+use crate::{
+    hittable::{Hittable, Hittables},
+    objects::Sphere,
+};
 
 #[derive(Debug)]
 pub struct Ray {
@@ -47,7 +54,22 @@ impl Ray {
         white.mix(&blue, a)
     }
 
-    pub fn hit_sphere(&self, sphere_center: Vec3, sphere_radius: f32) -> f32 {
+    pub fn normal_color_hittables(&self, hittables: &Hittables, range: Range<f32>) -> Color {
+        match hittables.hit(self, range) {
+            Some(hit) => {
+                let mut n: Vec3 = hit.normal.into();
+
+                // Each component has possible range [-1.0, 1.0], so remap
+                n += Vec3::ONE;
+                n /= 2.0;
+
+                LinearRgba::new(n.x, n.y, n.z, 1.0).into()
+            }
+            None => self.color(),
+        }
+    }
+
+    pub fn hit_sphere(&self, sphere: &Sphere) -> f32 {
         // We got (-b +- sqrt(b^2 - 4ac)) / 2a.
         // If we substitute b = -2h:
         // 2h +- sqrt(4h^2 - 4ac) / 2a = (2h +- 2 * sqrt(h^2 - ac)) / 2a =
@@ -58,12 +80,12 @@ impl Ray {
         // then h = ray_dir.dot(-ray_origin + sphere_center)
 
         let d = self.inner.direction;
-        let q = -self.inner.origin + sphere_center;
+        let q = -self.inner.origin + sphere.center;
 
         let h = d.dot(q);
 
         let b = -2. * d.dot(q);
-        let c = q.length_squared() - sphere_radius.powi(2);
+        let c = q.length_squared() - sphere.radius.powi(2);
 
         let discriminant = h.norm_squared() - c;
 

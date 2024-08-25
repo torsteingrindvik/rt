@@ -3,6 +3,7 @@ use tracing::debug;
 
 use crate::hittable::{Hit, Hittable};
 
+#[derive(Debug)]
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,

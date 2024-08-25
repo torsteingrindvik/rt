@@ -2,6 +2,8 @@ use bevy_color::{palettes, Color};
 use bevy_color::{ColorToPacked, LinearRgba};
 use bevy_math::{Dir3, Vec3};
 use clap::{Parser, Subcommand};
+use rt_one::hittable::Hittables;
+use rt_one::objects::Sphere;
 use rt_one::ppm;
 use rt_one::ray;
 use rt_one::setup::Setup;
@@ -112,8 +114,12 @@ fn ray_sphere() -> anyhow::Result<()> {
             }
 
             let ray = ray::Ray::new(cam_origin, dir);
+            let sphere = Sphere {
+                center: Vec3::new(0.0, 0.0, -1.0),
+                radius: 0.5,
+            };
 
-            let color: Color = if ray.hit_sphere(Vec3::new(0.0, 0.0, -1.0), 0.5) >= 0.0 {
+            let color: Color = if ray.hit_sphere(&sphere) >= 0.0 {
                 palettes::tailwind::RED_500.into()
             } else {
                 ray.color()
@@ -154,12 +160,15 @@ fn ray_sphere_normal_colors() -> anyhow::Result<()> {
 
             let ray = ray::Ray::new(cam_origin, dir);
 
-            let sphere_pos = Vec3::new(0.0, 0.0, -1.0);
-            let ray_hit_t = ray.hit_sphere(sphere_pos, 0.5);
+            let sphere = Sphere {
+                center: Vec3::new(0.0, 0.0, -1.0),
+                radius: 0.5,
+            };
+            let ray_hit_t = ray.hit_sphere(&sphere);
 
             let color = if ray_hit_t > 0.0 {
                 let hit_pos = ray.at(ray_hit_t);
-                let mut n = (-sphere_pos + hit_pos).normalize();
+                let mut n = (-sphere.center + hit_pos).normalize();
 
                 // Each component has possible range [-1.0, 1.0], so remap
                 n += Vec3::ONE;
@@ -188,6 +197,17 @@ fn hittables() -> anyhow::Result<()> {
         ..
     } = Setup::new();
 
+    let mut world = Hittables::default();
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.0),
+        radius: 0.5,
+    });
+    world.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+    });
+
     let mut data = vec![];
 
     for row in 0..im_height {
@@ -205,26 +225,11 @@ fn hittables() -> anyhow::Result<()> {
             }
 
             let ray = ray::Ray::new(cam_origin, dir);
+            let color = ray.normal_color_hittables(&world, 0.0..100.0);
 
-            let sphere_pos = Vec3::new(0.0, 0.0, -1.0);
-            let ray_hit_t = ray.hit_sphere(sphere_pos, 0.5);
-
-            let color = if ray_hit_t > 0.0 {
-                let hit_pos = ray.at(ray_hit_t);
-                let mut n = (-sphere_pos + hit_pos).normalize();
-
-                // Each component has possible range [-1.0, 1.0], so remap
-                n += Vec3::ONE;
-                n /= 2.0;
-
-                LinearRgba::new(n.x, n.y, n.z, 1.0)
-            } else {
-                ray.color().to_linear()
-            };
-
-            data.extend(color.to_u8_array_no_alpha());
+            data.extend(color.to_linear().to_u8_array_no_alpha());
         }
     }
 
-    ppm::write_pathlike(im_height, data, "ray_sphere_normal.ppm")
+    ppm::write_pathlike(im_height, data, "hittables.ppm")
 }

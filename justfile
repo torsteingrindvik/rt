@@ -11,3 +11,4 @@ all:
     cargo run -- gradient
     cargo run -- ray-sphere
     cargo run -- ray-sphere-normal
+    cargo run -- hittables

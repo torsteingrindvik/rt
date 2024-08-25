@@ -26,10 +26,11 @@ pub struct Hit {
     pub distance: f32,
 }
 
-pub trait Hittable {
+pub trait Hittable: std::fmt::Debug {
     fn hit(&self, ray: &Ray, t_range: Range<f32>) -> Option<Hit>;
 }
 
+#[derive(Debug, Default)]
 pub struct Hittables {
     pub objects: Vec<Arc<Box<dyn Hittable>>>,
 }
