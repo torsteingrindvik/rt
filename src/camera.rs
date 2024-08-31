@@ -1,11 +1,10 @@
-use std::path::Path;
+use std::{ops::Range, path::Path};
 
-use bevy_color::{ColorToPacked, LinearRgba, Srgba};
+use bevy_color::{Color, ColorToComponents, ColorToPacked, LinearRgba, Mix};
 use bevy_math::{vec3, Dir3, Vec2, Vec3, VectorSpace};
 use rand::random;
-use tracing::info;
 
-use crate::{hittable::Hittable, ppm, ray};
+use crate::{hittable::Hittable, ppm, random::random_on_hemisphere, ray};
 
 #[allow(dead_code)]
 pub struct Camera {
@@ -28,6 +27,7 @@ pub struct Camera {
     pub samples_per_pixel: usize,
     pub bounce: usize,
     pub min_dist: f32,
+    pub lambertian: bool,
 }
 
 impl Camera {
@@ -84,6 +84,7 @@ impl Camera {
             samples_per_pixel: samples,
             bounce: 0,
             min_dist: 0.0,
+            lambertian: false,
         }
     }
 
@@ -123,11 +124,13 @@ impl Camera {
                     let max_dist = 10_000_000.0;
 
                     if self.bounce > 0 {
-                        color += ray
-                            .world_color_bounce(world, self.min_dist..max_dist, self.bounce)
+                        color += self
+                            .world_color_bounce(&ray, world, self.min_dist..max_dist, self.bounce)
                             .to_linear();
                     } else {
-                        color += ray.world_color(world, self.min_dist..max_dist).to_linear();
+                        color += self
+                            .world_color(&ray, world, self.min_dist..max_dist)
+                            .to_linear();
                     }
                 }
 
@@ -140,5 +143,59 @@ impl Camera {
         ppm::write_pathlike(self.im_height, data, output_file)?;
 
         Ok(())
+    }
+
+    pub fn sky_color(&self, ray: &ray::Ray) -> Color {
+        let y = ray.direction().y;
+
+        // Range [-1.0, 1.0] rescaled to [0.0, 1.0].
+        // When looking down, we're looking more and more towards -1.0 (remapped to 0.0).
+        // In that case we want white. So that's the start value.
+        let a = (y + 1.0) * 0.5;
+
+        let white = Color::WHITE;
+        let blue: Color = LinearRgba::from_vec3(vec3(0.5, 0.7, 1.0)).into();
+
+        white.mix(&blue, a)
+    }
+
+    pub fn world_color(&self, ray: &ray::Ray, world: &dyn Hittable, range: Range<f32>) -> Color {
+        match world.hit(ray, range) {
+            // hit: remap the colors of the surface normal
+            Some(hit) => LinearRgba::from_vec3(0.5 * (Vec3::from(hit.normal) + Vec3::ONE)).into(),
+            None => self.sky_color(ray),
+        }
+    }
+
+    pub fn world_color_bounce(
+        &self,
+        ray: &ray::Ray,
+        world: &dyn Hittable,
+        range: Range<f32>,
+        bounce: usize,
+    ) -> Color {
+        // either exhaust the bounces (dark!)
+        // or return sky color with less color proportional to # bounces
+
+        if bounce == 0 {
+            return Color::BLACK;
+        }
+
+        match world.hit(ray, range.clone()) {
+            Some(hit) => {
+                let new_dir = random_on_hemisphere(hit.normal);
+
+                (0.5 * self
+                    .world_color_bounce(
+                        &ray::Ray::new(hit.point, new_dir),
+                        world,
+                        range,
+                        bounce - 1,
+                    )
+                    .to_linear())
+                .into()
+            }
+            None => self.sky_color(ray),
+        }
     }
 }

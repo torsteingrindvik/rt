@@ -1,10 +1,7 @@
-use std::ops::Range;
-
-use bevy_color::{Color, ColorToComponents, LinearRgba, Mix};
-use bevy_math::{vec3, Dir3, NormedVectorSpace, Ray3d, Vec3};
+use bevy_math::{Dir3, NormedVectorSpace, Ray3d, Vec3};
 use tracing::debug;
 
-use crate::{hittable::Hittable, objects::Sphere, random::random_on_hemisphere};
+use crate::objects::Sphere;
 
 #[derive(Debug)]
 pub struct Ray {
@@ -35,53 +32,6 @@ impl Ray {
     /// A position some distance along the ray
     pub fn at(&self, t: f32) -> Vec3 {
         self.inner.get_point(t)
-    }
-
-    pub fn sky_color(&self) -> Color {
-        let y = self.inner.direction.y;
-
-        // Range [-1.0, 1.0] rescaled to [0.0, 1.0].
-        // When looking down, we're looking more and more towards -1.0 (remapped to 0.0).
-        // In that case we want white. So that's the start value.
-        let a = (y + 1.0) * 0.5;
-
-        let white = Color::WHITE;
-        let blue: Color = LinearRgba::from_vec3(vec3(0.5, 0.7, 1.0)).into();
-
-        white.mix(&blue, a)
-    }
-
-    pub fn world_color(&self, world: &dyn Hittable, range: Range<f32>) -> Color {
-        match world.hit(self, range) {
-            // hit: remap the colors of the surface normal
-            Some(hit) => LinearRgba::from_vec3(0.5 * (Vec3::from(hit.normal) + Vec3::ONE)).into(),
-            None => self.sky_color(),
-        }
-    }
-
-    pub fn world_color_bounce(
-        &self,
-        world: &dyn Hittable,
-        range: Range<f32>,
-        bounce: usize,
-    ) -> Color {
-        // either exhaust the bounces (dark!)
-        // or return sky color with less color proportional to # bounces
-
-        if bounce == 0 {
-            return Color::BLACK;
-        }
-
-        match world.hit(self, range.clone()) {
-            Some(hit) => {
-                let new_dir = random_on_hemisphere(hit.normal);
-                (0.5 * Self::new(hit.point, new_dir)
-                    .world_color_bounce(world, range, bounce - 1)
-                    .to_linear())
-                .into()
-            }
-            None => self.sky_color(),
-        }
     }
 
     pub fn hit_sphere(&self, sphere: &Sphere) -> f32 {

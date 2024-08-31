@@ -40,6 +40,9 @@ enum Command {
 
     /// Diffuse sphere without shadow acne. Chapter 9.3
     DiffuseNoAcne,
+
+    /// Using Lambertian scattering instead of uniform. Chapter 9.4
+    Lambertian,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -56,6 +59,7 @@ fn main() -> anyhow::Result<()> {
         Command::AntiAliasing => anti_aliasing(),
         Command::FirstDiffuse => first_diffuse(),
         Command::DiffuseNoAcne => diffuse_no_acne(),
+        Command::Lambertian => lambertian(),
     }
 }
 
@@ -72,60 +76,35 @@ fn first_ppm() -> anyhow::Result<()> {
 }
 
 fn gradient() -> anyhow::Result<()> {
-    let Camera {
-        im_width,
-        im_height,
-        du,
-        dv,
-        pixel00_origin,
-        cam_origin,
-        ..
-    } = Camera::new();
+    let camera = Camera::new();
 
     let mut data = vec![];
 
-    for row in 0..im_height {
-        for col in 0..im_width {
-            let pixel = pixel00_origin + (row as f32 * dv) + (col as f32 * du);
-            let dir = Dir3::new_unchecked((-cam_origin + pixel).normalize());
-            let ray = ray::Ray::new(cam_origin, dir);
+    for row in 0..camera.im_height {
+        for col in 0..camera.im_width {
+            let pixel = camera.pixel00_origin + (row as f32 * camera.dv) + (col as f32 * camera.du);
+            let dir = Dir3::new_unchecked((-camera.cam_origin + pixel).normalize());
+            let ray = ray::Ray::new(camera.cam_origin, dir);
 
-            let color = ray.sky_color();
+            let color = camera.sky_color(&ray);
             data.extend(color.to_linear().to_u8_array_no_alpha());
         }
     }
 
-    ppm::write_pathlike(im_height, data, "gradient.ppm")
+    ppm::write_pathlike(camera.im_height, data, "gradient.ppm")
 }
 
 fn ray_sphere() -> anyhow::Result<()> {
-    let Camera {
-        im_width,
-        im_height,
-        du,
-        dv,
-        pixel00_origin,
-        cam_origin,
-        ..
-    } = Camera::new();
+    let camera = Camera::new();
 
     let mut data = vec![];
 
-    for row in 0..im_height {
-        for col in 0..im_width {
-            let pixel = pixel00_origin + (row as f32 * dv) + (col as f32 * du);
-            // Unit direction from camera to pixel
-            let dir: Dir3 = Dir3::new_unchecked((-cam_origin + pixel).normalize());
+    for row in 0..camera.im_height {
+        for col in 0..camera.im_width {
+            let pixel = camera.pixel00_origin + (row as f32 * camera.dv) + (col as f32 * camera.du);
+            let dir = Dir3::new_unchecked((-camera.cam_origin + pixel).normalize());
+            let ray = ray::Ray::new(camera.cam_origin, dir);
 
-            if row == 0 && col == 0 {
-                info!("First row, first col, dir: {dir:#?}. Pixel origin: {pixel00_origin:#?}");
-            }
-
-            if row == (im_height - 1) && col == (im_width - 1) {
-                info!("Last row, last col, dir: {dir:#?}");
-            }
-
-            let ray = ray::Ray::new(cam_origin, dir);
             let sphere = Sphere {
                 center: Vec3::new(0.0, 0.0, -1.0),
                 radius: 0.5,
@@ -134,43 +113,39 @@ fn ray_sphere() -> anyhow::Result<()> {
             let color: Color = if ray.hit_sphere(&sphere) >= 0.0 {
                 palettes::tailwind::RED_500.into()
             } else {
-                ray.sky_color()
+                camera.sky_color(&ray)
             };
+
             data.extend(color.to_linear().to_u8_array_no_alpha());
         }
     }
 
-    ppm::write_pathlike(im_height, data, "ray_sphere.ppm")
+    ppm::write_pathlike(camera.im_height, data, "ray_sphere.ppm")
 }
 
 fn ray_sphere_normal_colors() -> anyhow::Result<()> {
-    let Camera {
-        im_width,
-        im_height,
-        du,
-        dv,
-        pixel00_origin,
-        cam_origin,
-        ..
-    } = Camera::new();
+    let c = Camera::new();
 
     let mut data = vec![];
 
-    for row in 0..im_height {
-        for col in 0..im_width {
-            let pixel = pixel00_origin + (row as f32 * dv) + (col as f32 * du);
+    for row in 0..c.im_height {
+        for col in 0..c.im_width {
+            let pixel = c.pixel00_origin + (row as f32 * c.dv) + (col as f32 * c.du);
             // Unit direction from camera to pixel
-            let dir: Dir3 = Dir3::new_unchecked((-cam_origin + pixel).normalize());
+            let dir: Dir3 = Dir3::new_unchecked((-c.cam_origin + pixel).normalize());
 
             if row == 0 && col == 0 {
-                info!("First row, first col, dir: {dir:#?}. Pixel origin: {pixel00_origin:#?}");
+                info!(
+                    "First row, first col, dir: {dir:#?}. Pixel origin: {:#?}",
+                    c.pixel00_origin
+                );
             }
 
-            if row == (im_height - 1) && col == (im_width - 1) {
+            if row == (c.im_height - 1) && col == (c.im_width - 1) {
                 info!("Last row, last col, dir: {dir:#?}");
             }
 
-            let ray = ray::Ray::new(cam_origin, dir);
+            let ray = ray::Ray::new(c.cam_origin, dir);
 
             let sphere = Sphere {
                 center: Vec3::new(0.0, 0.0, -1.0),
@@ -188,14 +163,14 @@ fn ray_sphere_normal_colors() -> anyhow::Result<()> {
 
                 LinearRgba::new(n.x, n.y, n.z, 1.0)
             } else {
-                ray.sky_color().to_linear()
+                c.sky_color(&ray).to_linear()
             };
 
             data.extend(color.to_u8_array_no_alpha());
         }
     }
 
-    ppm::write_pathlike(im_height, data, "ray_sphere_normal.ppm")
+    ppm::write_pathlike(c.im_height, data, "ray_sphere_normal.ppm")
 }
 
 fn hittables() -> anyhow::Result<()> {
@@ -246,6 +221,24 @@ fn first_diffuse() -> anyhow::Result<()> {
 }
 
 fn diffuse_no_acne() -> anyhow::Result<()> {
+    let mut world = Hittables::default();
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.0),
+        radius: 0.5,
+    });
+    world.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+    });
+
+    let mut camera = Camera::with_samples_per_pixel(10);
+    camera.bounce = 50;
+    camera.min_dist = 0.001;
+    camera.render(&world, "diffuse_no_acne.ppm")
+}
+
+fn lambertian() -> anyhow::Result<()> {
     let mut world = Hittables::default();
 
     world.add(Sphere {
