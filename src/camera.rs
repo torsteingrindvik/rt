@@ -171,9 +171,9 @@ impl Camera {
                 color /= self.samples_per_pixel as f32;
 
                 data.extend(if self.srgb_output {
-                    color.to_u8_array_no_alpha()
-                } else {
                     Srgba::from(color).to_u8_array_no_alpha()
+                } else {
+                    color.to_u8_array_no_alpha()
                 });
             }
         }
