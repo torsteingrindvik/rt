@@ -4,10 +4,7 @@ use bevy_color::{Color, ColorToComponents, LinearRgba, Mix};
 use bevy_math::{vec3, Dir3, NormedVectorSpace, Ray3d, Vec3};
 use tracing::debug;
 
-use crate::{
-    hittable::{Hittable, Hittables},
-    objects::Sphere,
-};
+use crate::{hittable::Hittable, objects::Sphere, random::random_on_hemisphere};
 
 #[derive(Debug)]
 pub struct Ray {
@@ -40,7 +37,7 @@ impl Ray {
         self.inner.get_point(t)
     }
 
-    pub fn color(&self) -> Color {
+    pub fn sky_color(&self) -> Color {
         let y = self.inner.direction.y;
 
         // Range [-1.0, 1.0] rescaled to [0.0, 1.0].
@@ -54,18 +51,36 @@ impl Ray {
         white.mix(&blue, a)
     }
 
-    pub fn normal_color_hittables(&self, hittables: &Hittables, range: Range<f32>) -> Color {
-        match hittables.hit(self, range) {
+    pub fn world_color(&self, world: &dyn Hittable, range: Range<f32>) -> Color {
+        match world.hit(self, range) {
+            // hit: remap the colors of the surface normal
+            Some(hit) => LinearRgba::from_vec3(0.5 * (Vec3::from(hit.normal) + Vec3::ONE)).into(),
+            None => self.sky_color(),
+        }
+    }
+
+    pub fn world_color_bounce(
+        &self,
+        world: &dyn Hittable,
+        range: Range<f32>,
+        bounce: usize,
+    ) -> Color {
+        // either exhaust the bounces (dark!)
+        // or return sky color with less color proportional to # bounces
+
+        if bounce == 0 {
+            return Color::BLACK;
+        }
+
+        match world.hit(self, range.clone()) {
             Some(hit) => {
-                let mut n: Vec3 = hit.normal.into();
-
-                // Each component has possible range [-1.0, 1.0], so remap
-                n += Vec3::ONE;
-                n /= 2.0;
-
-                LinearRgba::new(n.x, n.y, n.z, 1.0).into()
+                let new_dir = random_on_hemisphere(hit.normal);
+                (0.5 * Self::new(hit.point, new_dir)
+                    .world_color_bounce(world, range, bounce - 1)
+                    .to_linear())
+                .into()
             }
-            None => self.color(),
+            None => self.sky_color(),
         }
     }
 
