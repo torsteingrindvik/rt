@@ -9,9 +9,12 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn new(origin: Vec3, direction: Dir3) -> Self {
+    pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {
-            inner: Ray3d { origin, direction },
+            inner: Ray3d {
+                origin,
+                direction: Dir3::new_unchecked(direction.normalize()),
+            },
         }
     }
 

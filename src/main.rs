@@ -1,6 +1,6 @@
 use bevy_color::{palettes, Color};
 use bevy_color::{ColorToPacked, LinearRgba};
-use bevy_math::{Dir3, Vec3};
+use bevy_math::Vec3;
 use clap::{Parser, Subcommand};
 use rt_one::camera::Camera;
 use rt_one::hittable::Hittables;
@@ -43,6 +43,9 @@ enum Command {
 
     /// Using Lambertian scattering instead of uniform. Chapter 9.4
     Lambertian,
+
+    /// Apply gamma correction by moving from linear to sRGB. Chapter 9.5
+    Gamma,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -60,6 +63,7 @@ fn main() -> anyhow::Result<()> {
         Command::FirstDiffuse => first_diffuse(),
         Command::DiffuseNoAcne => diffuse_no_acne(),
         Command::Lambertian => lambertian(),
+        Command::Gamma => gamma(),
     }
 }
 
@@ -83,7 +87,7 @@ fn gradient() -> anyhow::Result<()> {
     for row in 0..camera.im_height {
         for col in 0..camera.im_width {
             let pixel = camera.pixel00_origin + (row as f32 * camera.dv) + (col as f32 * camera.du);
-            let dir = Dir3::new_unchecked((-camera.cam_origin + pixel).normalize());
+            let dir = -camera.cam_origin + pixel;
             let ray = ray::Ray::new(camera.cam_origin, dir);
 
             let color = camera.sky_color(&ray);
@@ -102,7 +106,7 @@ fn ray_sphere() -> anyhow::Result<()> {
     for row in 0..camera.im_height {
         for col in 0..camera.im_width {
             let pixel = camera.pixel00_origin + (row as f32 * camera.dv) + (col as f32 * camera.du);
-            let dir = Dir3::new_unchecked((-camera.cam_origin + pixel).normalize());
+            let dir = -camera.cam_origin + pixel;
             let ray = ray::Ray::new(camera.cam_origin, dir);
 
             let sphere = Sphere {
@@ -132,7 +136,7 @@ fn ray_sphere_normal_colors() -> anyhow::Result<()> {
         for col in 0..c.im_width {
             let pixel = c.pixel00_origin + (row as f32 * c.dv) + (col as f32 * c.du);
             // Unit direction from camera to pixel
-            let dir: Dir3 = Dir3::new_unchecked((-c.cam_origin + pixel).normalize());
+            let dir = -c.cam_origin + pixel;
 
             if row == 0 && col == 0 {
                 info!(
@@ -252,6 +256,27 @@ fn lambertian() -> anyhow::Result<()> {
 
     let mut camera = Camera::with_samples_per_pixel(10);
     camera.bounce = 50;
+    camera.lambertian = true;
     camera.min_dist = 0.001;
-    camera.render(&world, "diffuse_no_acne.ppm")
+    camera.render(&world, "lambertian.ppm")
+}
+
+fn gamma() -> anyhow::Result<()> {
+    let mut world = Hittables::default();
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.0),
+        radius: 0.5,
+    });
+    world.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+    });
+
+    let mut camera = Camera::with_samples_per_pixel(10);
+    camera.bounce = 50;
+    camera.lambertian = true;
+    camera.min_dist = 0.001;
+    camera.srgb_output = true;
+    camera.render(&world, "gamma.ppm")
 }

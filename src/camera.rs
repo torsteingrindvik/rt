@@ -1,7 +1,7 @@
 use std::{ops::Range, path::Path};
 
-use bevy_color::{Color, ColorToComponents, ColorToPacked, LinearRgba, Mix};
-use bevy_math::{vec3, Dir3, Vec2, Vec3, VectorSpace};
+use bevy_color::{Color, ColorToComponents, ColorToPacked, LinearRgba, Mix, Srgba};
+use bevy_math::{vec3, Vec2, Vec3, VectorSpace};
 use rand::random;
 
 use crate::{hittable::Hittable, ppm, random::random_on_hemisphere, ray};
@@ -28,6 +28,7 @@ pub struct Camera {
     pub bounce: usize,
     pub min_dist: f32,
     pub lambertian: bool,
+    pub srgb_output: bool,
 }
 
 impl Camera {
@@ -85,6 +86,7 @@ impl Camera {
             bounce: 0,
             min_dist: 0.0,
             lambertian: false,
+            srgb_output: false,
         }
     }
 
@@ -103,7 +105,7 @@ impl Camera {
         pixel += perturb.y * self.dv;
 
         // Unit direction from camera to pixel
-        let dir: Dir3 = Dir3::new_unchecked((-self.cam_origin + pixel).normalize());
+        let dir = -self.cam_origin + pixel;
         ray::Ray::new(self.cam_origin, dir)
     }
 
@@ -136,7 +138,11 @@ impl Camera {
 
                 color /= self.samples_per_pixel as f32;
 
-                data.extend(color.to_u8_array_no_alpha());
+                data.extend(if self.srgb_output {
+                    color.to_u8_array_no_alpha()
+                } else {
+                    Srgba::from(color).to_u8_array_no_alpha()
+                });
             }
         }
 
@@ -183,7 +189,11 @@ impl Camera {
 
         match world.hit(ray, range.clone()) {
             Some(hit) => {
-                let new_dir = random_on_hemisphere(hit.normal);
+                let new_dir = if self.lambertian {
+                    hit.normal.as_vec3() + random_on_hemisphere(hit.normal).as_vec3()
+                } else {
+                    random_on_hemisphere(hit.normal).as_vec3()
+                };
 
                 (0.5 * self
                     .world_color_bounce(

@@ -1,4 +1,5 @@
 alias c := clean
+alias r := run
 
 default:
     @just --list
@@ -15,3 +16,8 @@ all:
     cargo run --release -- anti-aliasing
     cargo run --release -- first-diffuse
     cargo run --release -- diffuse-no-acne
+    cargo run --release -- lambertian
+    cargo run --release -- gamma
+
+run THING:
+    cargo run --release -- {{THING}}
