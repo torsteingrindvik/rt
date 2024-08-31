@@ -278,5 +278,6 @@ fn gamma() -> anyhow::Result<()> {
     camera.lambertian = true;
     camera.min_dist = 0.001;
     camera.srgb_output = true;
+    camera.reflectance_groups = true;
     camera.render(&world, "gamma.ppm")
 }

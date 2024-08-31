@@ -29,6 +29,10 @@ pub struct Camera {
     pub min_dist: f32,
     pub lambertian: bool,
     pub srgb_output: bool,
+
+    /// If true, change reflectance by column
+    /// in 5 groups from 10% up to 90% (20% steps)
+    pub reflectance_groups: bool,
 }
 
 impl Camera {
@@ -87,6 +91,7 @@ impl Camera {
             min_dist: 0.0,
             lambertian: false,
             srgb_output: false,
+            reflectance_groups: false,
         }
     }
 
@@ -109,6 +114,27 @@ impl Camera {
         ray::Ray::new(self.cam_origin, dir)
     }
 
+    fn reflectance(&self, col: usize) -> f32 {
+        if self.reflectance_groups {
+            // range: [0.0, 1.0)
+            let width_percentage = (col as f32) / (self.im_width as f32);
+            // range: [0.0, 5.0)
+            let reflectance = width_percentage * 5.0;
+            // steps: [0.0, 1.0, 2.0, 3.0, 4.0]
+            let reflectance = reflectance.floor();
+            // steps: [0.0, 0.1, 0.2, 0.3, 0.4]
+            let reflectance = reflectance / 10.0;
+            // steps: [0.0, 0.2, 0.4, 0.6, 0.8]
+            let reflectance = reflectance * 2.0;
+            // steps: [0.1, 0.3, 0.5, 0.7, 0.9]
+            let reflectance = reflectance + 0.1;
+
+            reflectance
+        } else {
+            0.5
+        }
+    }
+
     pub fn render(
         &self,
         world: &dyn Hittable,
@@ -127,7 +153,13 @@ impl Camera {
 
                     if self.bounce > 0 {
                         color += self
-                            .world_color_bounce(&ray, world, self.min_dist..max_dist, self.bounce)
+                            .world_color_bounce(
+                                &ray,
+                                world,
+                                self.min_dist..max_dist,
+                                self.bounce,
+                                self.reflectance(col),
+                            )
                             .to_linear();
                     } else {
                         color += self
@@ -179,6 +211,7 @@ impl Camera {
         world: &dyn Hittable,
         range: Range<f32>,
         bounce: usize,
+        reflectance: f32,
     ) -> Color {
         // either exhaust the bounces (dark!)
         // or return sky color with less color proportional to # bounces
@@ -195,14 +228,16 @@ impl Camera {
                     random_on_hemisphere(hit.normal).as_vec3()
                 };
 
-                (0.5 * self
-                    .world_color_bounce(
-                        &ray::Ray::new(hit.point, new_dir),
-                        world,
-                        range,
-                        bounce - 1,
-                    )
-                    .to_linear())
+                (reflectance
+                    * self
+                        .world_color_bounce(
+                            &ray::Ray::new(hit.point, new_dir),
+                            world,
+                            range,
+                            bounce - 1,
+                            reflectance,
+                        )
+                        .to_linear())
                 .into()
             }
             None => self.sky_color(ray),
