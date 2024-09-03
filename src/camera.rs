@@ -4,7 +4,7 @@ use bevy_color::{Color, ColorToComponents, ColorToPacked, LinearRgba, Mix, Srgba
 use bevy_math::{vec3, Vec2, Vec3, VectorSpace};
 use rand::random;
 
-use crate::{hittable::Hittable, ppm, random::random_on_hemisphere, ray};
+use crate::{hittable::Hittable, ppm, ray};
 
 #[allow(dead_code)]
 pub struct Camera {
@@ -27,7 +27,6 @@ pub struct Camera {
     pub samples_per_pixel: usize,
     pub bounce: usize,
     pub min_dist: f32,
-    pub lambertian: bool,
     pub srgb_output: bool,
 
     /// If true, change reflectance by column
@@ -89,7 +88,6 @@ impl Camera {
             samples_per_pixel: samples,
             bounce: 0,
             min_dist: 0.0,
-            lambertian: false,
             srgb_output: false,
             reflectance_groups: false,
         }
@@ -158,7 +156,7 @@ impl Camera {
                                 world,
                                 self.min_dist..max_dist,
                                 self.bounce,
-                                self.reflectance(col),
+                                // self.reflectance(col),
                             )
                             .to_linear();
                     } else {
@@ -211,7 +209,7 @@ impl Camera {
         world: &dyn Hittable,
         range: Range<f32>,
         bounce: usize,
-        reflectance: f32,
+        // reflectance: f32,
     ) -> Color {
         // either exhaust the bounces (dark!)
         // or return sky color with less color proportional to # bounces
@@ -222,23 +220,18 @@ impl Camera {
 
         match world.hit(ray, range.clone()) {
             Some(hit) => {
-                let new_dir = if self.lambertian {
-                    hit.normal.as_vec3() + random_on_hemisphere(hit.normal).as_vec3()
+                if let Some(scattered) = hit.material.scatter(ray, &hit) {
+                    LinearRgba::from_vec3(
+                        scattered.attenuation.to_linear().to_vec3()
+                            * self
+                                .world_color_bounce(&scattered.ray, world, range, bounce - 1)
+                                .to_linear()
+                                .to_vec3(),
+                    )
+                    .into()
                 } else {
-                    random_on_hemisphere(hit.normal).as_vec3()
-                };
-
-                (reflectance
-                    * self
-                        .world_color_bounce(
-                            &ray::Ray::new(hit.point, new_dir),
-                            world,
-                            range,
-                            bounce - 1,
-                            reflectance,
-                        )
-                        .to_linear())
-                .into()
+                    unimplemented!()
+                }
             }
             None => self.sky_color(ray),
         }

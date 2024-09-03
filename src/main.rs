@@ -4,6 +4,7 @@ use bevy_math::Vec3;
 use clap::{Parser, Subcommand};
 use rt_one::camera::Camera;
 use rt_one::hittable::Hittables;
+use rt_one::material::{Lambertian, Metal};
 use rt_one::objects::Sphere;
 use rt_one::ppm;
 use rt_one::ray;
@@ -46,6 +47,9 @@ enum Command {
 
     /// Apply gamma correction by moving from linear to sRGB. Chapter 9.5
     Gamma,
+
+    /// Metal. Chapter 10.5
+    Metal,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -64,6 +68,7 @@ fn main() -> anyhow::Result<()> {
         Command::DiffuseNoAcne => diffuse_no_acne(),
         Command::Lambertian => lambertian(),
         Command::Gamma => gamma(),
+        Command::Metal => metal(),
     }
 }
 
@@ -112,6 +117,7 @@ fn ray_sphere() -> anyhow::Result<()> {
             let sphere = Sphere {
                 center: Vec3::new(0.0, 0.0, -1.0),
                 radius: 0.5,
+                ..Default::default()
             };
 
             let color: Color = if ray.hit_sphere(&sphere) >= 0.0 {
@@ -154,6 +160,7 @@ fn ray_sphere_normal_colors() -> anyhow::Result<()> {
             let sphere = Sphere {
                 center: Vec3::new(0.0, 0.0, -1.0),
                 radius: 0.5,
+                ..Default::default()
             };
             let ray_hit_t = ray.hit_sphere(&sphere);
 
@@ -183,10 +190,12 @@ fn hittables() -> anyhow::Result<()> {
     world.add(Sphere {
         center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
+        ..Default::default()
     });
     world.add(Sphere {
         center: Vec3::new(0.0, -100.5, -1.0),
         radius: 100.0,
+        ..Default::default()
     });
 
     Camera::new().render(&world, "hittable.ppm")
@@ -198,10 +207,12 @@ fn anti_aliasing() -> anyhow::Result<()> {
     world.add(Sphere {
         center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
+        ..Default::default()
     });
     world.add(Sphere {
         center: Vec3::new(0.0, -100.5, -1.0),
         radius: 100.0,
+        ..Default::default()
     });
 
     Camera::with_samples_per_pixel(10).render(&world, "anti_aliasing.ppm")
@@ -213,10 +224,12 @@ fn first_diffuse() -> anyhow::Result<()> {
     world.add(Sphere {
         center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
+        ..Default::default()
     });
     world.add(Sphere {
         center: Vec3::new(0.0, -100.5, -1.0),
         radius: 100.0,
+        ..Default::default()
     });
 
     let mut camera = Camera::with_samples_per_pixel(10);
@@ -230,10 +243,12 @@ fn diffuse_no_acne() -> anyhow::Result<()> {
     world.add(Sphere {
         center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
+        ..Default::default()
     });
     world.add(Sphere {
         center: Vec3::new(0.0, -100.5, -1.0),
         radius: 100.0,
+        ..Default::default()
     });
 
     let mut camera = Camera::with_samples_per_pixel(10);
@@ -248,15 +263,16 @@ fn lambertian() -> anyhow::Result<()> {
     world.add(Sphere {
         center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
+        ..Default::default()
     });
     world.add(Sphere {
         center: Vec3::new(0.0, -100.5, -1.0),
         radius: 100.0,
+        ..Default::default()
     });
 
     let mut camera = Camera::with_samples_per_pixel(10);
     camera.bounce = 50;
-    camera.lambertian = true;
     camera.min_dist = 0.001;
     camera.render(&world, "lambertian.ppm")
 }
@@ -267,17 +283,64 @@ fn gamma() -> anyhow::Result<()> {
     world.add(Sphere {
         center: Vec3::new(0.0, 0.0, -1.0),
         radius: 0.5,
+        ..Default::default()
     });
     world.add(Sphere {
         center: Vec3::new(0.0, -100.5, -1.0),
         radius: 100.0,
+        ..Default::default()
     });
 
     let mut camera = Camera::with_samples_per_pixel(10);
     camera.bounce = 50;
-    camera.lambertian = true;
     camera.min_dist = 0.001;
     camera.srgb_output = true;
     camera.reflectance_groups = true;
     camera.render(&world, "gamma.ppm")
+}
+
+fn metal() -> anyhow::Result<()> {
+    let mut world = Hittables::default();
+
+    /*
+    auto material_ground = make_shared<lambertian>(color(0.8, 0.8, 0.0));
+    auto material_center = make_shared<lambertian>(color(0.1, 0.2, 0.5));
+    auto material_left   = make_shared<metal>(color(0.8, 0.8, 0.8));
+    auto material_right  = make_shared<metal>(color(0.8, 0.6, 0.2));
+
+    world.add(make_shared<sphere>(point3( 0.0, -100.5, -1.0), 100.0, material_ground));
+    world.add(make_shared<sphere>(point3( 0.0,    0.0, -1.2),   0.5, material_center));
+    world.add(make_shared<sphere>(point3(-1.0,    0.0, -1.0),   0.5, material_left));
+    world.add(make_shared<sphere>(point3( 1.0,    0.0, -1.0),   0.5, material_right));
+    */
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+        material: Lambertian::linear_rgb(0.8, 0.8, 0.0).into(),
+    });
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.2),
+        radius: 0.5,
+        material: Lambertian::linear_rgb(0.1, 0.2, 0.5).into(),
+    });
+
+    world.add(Sphere {
+        center: Vec3::new(-1.0, 0.0, -1.0),
+        radius: 0.5,
+        material: Metal::linear_rgb(0.8, 0.8, 0.8).into(),
+    });
+
+    world.add(Sphere {
+        center: Vec3::new(1.0, 0.0, -1.0),
+        radius: 0.5,
+        material: Metal::linear_rgb(0.8, 0.6, 0.2).into(),
+    });
+
+    let mut camera = Camera::with_samples_per_pixel(100);
+    camera.bounce = 50;
+    camera.min_dist = 0.001;
+    camera.srgb_output = true;
+    camera.render(&world, "metal.ppm")
 }

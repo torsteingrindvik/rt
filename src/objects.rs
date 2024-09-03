@@ -1,12 +1,30 @@
+use bevy_color::Color;
 use bevy_math::{Dir3, NormedVectorSpace, Vec3};
 use tracing::debug;
 
-use crate::hittable::{Hit, Hittable};
+use crate::{
+    hittable::{Hit, Hittable},
+    material::{DynMaterial, Lambertian},
+};
 
 #[derive(Debug)]
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f32,
+    pub material: DynMaterial,
+}
+
+impl Default for Sphere {
+    fn default() -> Self {
+        Self {
+            center: Vec3::new(0.0, 0.0, -1.0),
+            radius: 0.5,
+            material: Lambertian {
+                color: Color::linear_rgb(0.2, 0.4, 0.6),
+            }
+            .into(),
+        }
+    }
 }
 
 impl Hittable for Sphere {
@@ -63,8 +81,9 @@ impl Hittable for Sphere {
             Some(Hit {
                 point: at,
                 normal,
-                distance: t,
                 front_face,
+                distance: t,
+                material: self.material.clone(),
             })
         }
     }

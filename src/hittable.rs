@@ -1,8 +1,8 @@
-use std::{ops::Range, sync::Arc};
+use std::{fmt::Debug, ops::Range, sync::Arc};
 
 use bevy_math::{Dir3, Vec3};
 
-use crate::ray::Ray;
+use crate::{material::DynMaterial, ray::Ray};
 
 #[derive(Debug)]
 pub struct Hit {
@@ -24,6 +24,9 @@ pub struct Hit {
 
     /// Distance on the ray
     pub distance: f32,
+
+    /// The material hit
+    pub material: DynMaterial,
 }
 
 pub trait Hittable: std::fmt::Debug {

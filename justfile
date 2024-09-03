@@ -18,6 +18,7 @@ all:
     cargo run --release -- diffuse-no-acne
     cargo run --release -- lambertian
     cargo run --release -- gamma
+    cargo run --release -- metal
 
 run THING:
     cargo run --release -- {{THING}}
