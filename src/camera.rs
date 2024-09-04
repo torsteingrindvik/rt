@@ -230,7 +230,7 @@ impl Camera {
                     )
                     .into()
                 } else {
-                    unimplemented!()
+                    Color::BLACK
                 }
             }
             None => self.sky_color(ray),

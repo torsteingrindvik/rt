@@ -74,12 +74,23 @@ impl Material for Lambertian {
 #[derive(Debug)]
 pub struct Metal {
     pub color: Color,
+    pub fuzz: f32,
 }
 
 impl Metal {
+    /// Create a metallic material with a given fuzz factor.
+    /// The fuzz factor is clamped to the [0.0, 1.0] range.
+    pub fn new(color: Color, fuzz: f32) -> Self {
+        Self {
+            color,
+            fuzz: fuzz.clamp(0.0, 1.0),
+        }
+    }
+
     pub fn linear_rgb(red: f32, green: f32, blue: f32) -> Self {
         Self {
             color: LinearRgba::rgb(red, green, blue).into(),
+            fuzz: 0.0,
         }
     }
 }
@@ -101,12 +112,17 @@ impl Glam029 for Dir3 {
 impl Material for Metal {
     fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Scattering> {
         let scatter_dir = ray.direction().reflect(hit.normal);
+        let fuzzed_dir = scatter_dir.as_vec3().normalize() + self.fuzz * random_on_sphere();
 
-        let scattered = Ray::new(hit.point, *scatter_dir);
+        if hit.normal.dot(fuzzed_dir).is_sign_positive() {
+            let scattered = Ray::new(hit.point, fuzzed_dir);
 
-        Some(Scattering {
-            ray: scattered,
-            attenuation: self.color,
-        })
+            Some(Scattering {
+                ray: scattered,
+                attenuation: self.color,
+            })
+        } else {
+            None
+        }
     }
 }

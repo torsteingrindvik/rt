@@ -19,6 +19,7 @@ all:
     cargo run --release -- lambertian
     cargo run --release -- gamma
     cargo run --release -- metal
+    cargo run --release -- metal-fuzz
 
 run THING:
     cargo run --release -- {{THING}}
