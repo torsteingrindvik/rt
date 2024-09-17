@@ -20,6 +20,7 @@ all:
     cargo run --release -- gamma
     cargo run --release -- metal
     cargo run --release -- metal-fuzz
+    cargo run --release -- glass-refract
 
 run THING:
     cargo run --release -- {{THING}}

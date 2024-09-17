@@ -33,6 +33,12 @@ impl From<Metal> for DynMaterial {
     }
 }
 
+impl From<Dielectric> for DynMaterial {
+    fn from(value: Dielectric) -> Self {
+        Self::new(value)
+    }
+}
+
 pub trait Material: Debug {
     /// Given a ray and a [`Hit`] by that ray,
     /// scatter by the material properties
@@ -71,6 +77,36 @@ impl Material for Lambertian {
     }
 }
 
+// todo: glam 0.29 has a builtin reflect and refract
+trait Glam029 {
+    fn reflect(&self, normal: Dir3) -> Dir3;
+
+    // Eta is n1/n2 where n1 is the refractive index we're coming from,
+    // and n2 is the refractive index we are entering
+    fn refract(&self, normal: Dir3, eta: f32) -> Dir3;
+}
+
+impl Glam029 for Dir3 {
+    fn reflect(&self, normal: Dir3) -> Dir3 {
+        let me_v3 = self.as_vec3();
+        let n_v3 = normal.as_vec3();
+
+        Dir3::new_unchecked((me_v3 - 2.0 * me_v3.dot(n_v3) * n_v3).normalize())
+    }
+
+    fn refract(&self, normal: Dir3, eta: f32) -> Dir3 {
+        let i = self.as_vec3();
+        let n = normal.as_vec3();
+
+        let cos_theta = (-i.dot(n)).min(1.0);
+
+        let t_parallel = eta * (i + cos_theta * n);
+        let t_perpendicular = -n * (1. - (1. - cos_theta * cos_theta) * eta * eta).sqrt();
+
+        Dir3::new_unchecked((t_parallel + t_perpendicular).normalize())
+    }
+}
+
 #[derive(Debug)]
 pub struct Metal {
     pub color: Color,
@@ -95,20 +131,6 @@ impl Metal {
     }
 }
 
-// todo: glam 0.29 has a builtin reflect
-trait Glam029 {
-    fn reflect(&self, normal: Dir3) -> Dir3;
-}
-
-impl Glam029 for Dir3 {
-    fn reflect(&self, normal: Dir3) -> Dir3 {
-        let me_v3 = self.as_vec3();
-        let n_v3 = normal.as_vec3();
-
-        Dir3::new_unchecked((me_v3 - 2.0 * me_v3.dot(n_v3) * n_v3).normalize())
-    }
-}
-
 impl Material for Metal {
     fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Scattering> {
         let scatter_dir = ray.direction().reflect(hit.normal);
@@ -124,5 +146,43 @@ impl Material for Metal {
         } else {
             None
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct Dielectric {
+    pub color: Color,
+    pub refractive_index: f32,
+}
+
+impl Dielectric {
+    pub fn refraction_index(index: f32) -> Self {
+        Self {
+            color: LinearRgba::rgb(1.0, 1.0, 1.0).into(),
+            refractive_index: index,
+        }
+    }
+
+    pub fn linear_rgb(red: f32, green: f32, blue: f32) -> Self {
+        Self {
+            color: LinearRgba::rgb(red, green, blue).into(),
+            refractive_index: 1.5,
+        }
+    }
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, ray: &Ray, hit: &Hit) -> Option<Scattering> {
+        let n1 = 1.0; // air, ish
+        let n2 = self.refractive_index;
+
+        // If we hit the front face it means the incoming ray was from the outside, i.e. air.
+        // Else it means we were already inside this material and we are going out into air.
+        let eta = if hit.front_face { n1 / n2 } else { n2 / n1 };
+
+        Some(Scattering {
+            ray: Ray::new(hit.point, *ray.direction().refract(hit.normal, eta)),
+            attenuation: self.color,
+        })
     }
 }
