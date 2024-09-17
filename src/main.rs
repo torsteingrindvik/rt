@@ -56,6 +56,9 @@ enum Command {
 
     /// Refractive glass. Chapter 11.2
     GlassRefract,
+
+    /// Air bubble in water. Chapter 11.3
+    AirBubble,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -77,6 +80,7 @@ fn main() -> anyhow::Result<()> {
         Command::Metal => metal(),
         Command::MetalFuzz => metal_fuzz(),
         Command::GlassRefract => glass_refract(),
+        Command::AirBubble => air_bubble(),
     }
 }
 
@@ -407,4 +411,38 @@ fn glass_refract() -> anyhow::Result<()> {
     camera.min_dist = 0.001;
     camera.srgb_output = true;
     camera.render(&world, "glass_refract.ppm")
+}
+
+fn air_bubble() -> anyhow::Result<()> {
+    let mut world = Hittables::default();
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, -100.5, -1.0),
+        radius: 100.0,
+        material: Lambertian::linear_rgb(0.8, 0.8, 0.0).into(),
+    });
+
+    world.add(Sphere {
+        center: Vec3::new(0.0, 0.0, -1.2),
+        radius: 0.5,
+        material: Lambertian::linear_rgb(0.1, 0.2, 0.5).into(),
+    });
+
+    world.add(Sphere {
+        center: Vec3::new(-1.0, 0.0, -1.0),
+        radius: 0.5,
+        material: Dielectric::refraction_index(1.0 / 1.33).into(),
+    });
+
+    world.add(Sphere {
+        center: Vec3::new(1.0, 0.0, -1.0),
+        radius: 0.5,
+        material: Metal::new(Color::linear_rgb(0.8, 0.6, 0.2), 1.0).into(),
+    });
+
+    let mut camera = Camera::with_samples_per_pixel(100);
+    camera.bounce = 50;
+    camera.min_dist = 0.001;
+    camera.srgb_output = true;
+    camera.render(&world, "air_bubble.ppm")
 }

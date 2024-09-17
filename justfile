@@ -21,6 +21,7 @@ all:
     cargo run --release -- metal
     cargo run --release -- metal-fuzz
     cargo run --release -- glass-refract
+    cargo run --release -- air-bubble
 
 run THING:
     cargo run --release -- {{THING}}

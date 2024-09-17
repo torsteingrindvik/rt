@@ -180,9 +180,26 @@ impl Material for Dielectric {
         // Else it means we were already inside this material and we are going out into air.
         let eta = if hit.front_face { n1 / n2 } else { n2 / n1 };
 
-        Some(Scattering {
-            ray: Ray::new(hit.point, *ray.direction().refract(hit.normal, eta)),
-            attenuation: self.color,
-        })
+        let cos_theta = ray.direction().as_vec3().dot(hit.normal.as_vec3());
+
+        // If sinθi * η > 1.0, then we cannot find a sinθt such that
+        // sinθi * η = sinθt.
+        // In that case we must reflect instead.
+        //
+        // Since vectors are normalized we have 1 = sin^2θi + cos^2θi,
+        // and sinθi = sqrt(1 - cos^2θi).
+        let sin_theta = (1. - cos_theta * cos_theta).sqrt();
+
+        if sin_theta * eta > 1.0 {
+            Some(Scattering {
+                ray: Ray::new(hit.point, *ray.direction().reflect(hit.normal)),
+                attenuation: self.color,
+            })
+        } else {
+            Some(Scattering {
+                ray: Ray::new(hit.point, *ray.direction().refract(hit.normal, eta)),
+                attenuation: self.color,
+            })
+        }
     }
 }
